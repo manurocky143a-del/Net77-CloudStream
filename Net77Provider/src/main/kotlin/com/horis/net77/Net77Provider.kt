@@ -142,7 +142,6 @@ class Net77Provider : MainAPI() {
                 val fileUrl = if (rawFile.startsWith("http")) rawFile else "$mainUrl$rawFile"
                 val label   = source.label ?: "HD"
 
-                // Task 8: Verify HTTP 200 via OkHttp before returning stream link
                 val checkRes = try {
                     app.get(fileUrl, headers = commonHeaders, timeout = 10)
                 } catch (_: Throwable) {
