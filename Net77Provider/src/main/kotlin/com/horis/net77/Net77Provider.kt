@@ -10,7 +10,7 @@ import org.jsoup.nodes.Element
 
 class Net77Provider : MainAPI() {
 
-    override var name = "NetMirror (Net77)"
+    override var name = "Net77Provider"
     override var lang = "hi"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
@@ -43,9 +43,9 @@ class Net77Provider : MainAPI() {
     private var cookieValue = ""
 
     override val mainPage = mainPageOf(
-        "$mainUrl/mobile/home?app=1&ott=nf" to "Netflix",
-        "$mainUrl/mobile/home?app=1&ott=hs" to "Hotstar",
-        "$mainUrl/mobile/home?app=1&ott=pv" to "Prime Video"
+        "$mainUrl/mobile/home?app=1&ott=nf" to "Netflix Mirror",
+        "$mainUrl/mobile/home?app=1&ott=hs" to "Hotstar Mirror",
+        "$mainUrl/mobile/home?app=1&ott=pv" to "Prime Video Mirror"
     )
 
     private suspend fun getCookieCached(): String {
