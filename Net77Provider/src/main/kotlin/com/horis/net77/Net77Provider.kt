@@ -15,16 +15,17 @@ class Net77Provider : MainAPI() {
     override var mainUrl = "https://net77.cc"
 
     private val commonHeaders = mapOf(
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept"     to "*/*",
-        "Referer"    to "$mainUrl/"
+        "User-Agent"      to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept"          to "*/*",
+        "Accept-Language" to "en-US,en;q=0.9",
+        "Referer"         to "$mainUrl/"
     )
 
     override val mainPage = mainPageOf(
-        "$mainUrl/search.php?s=action"  to "Action Movies",
-        "$mainUrl/search.php?s=avatar"  to "Trending Hits",
-        "$mainUrl/search.php?s=marvel"  to "Superhero & Marvel",
-        "$mainUrl/search.php?s=netflix" to "Netflix Specials"
+        "$mainUrl/search.php?s=action"  to "Action Movies & Hits",
+        "$mainUrl/search.php?s=avatar"  to "Trending Titles",
+        "$mainUrl/search.php?s=marvel"  to "Superhero Collection",
+        "$mainUrl/search.php?s=netflix" to "Popular Specials"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
@@ -42,9 +43,10 @@ class Net77Provider : MainAPI() {
         val items = data.searchResult.orEmpty().mapNotNull { r ->
             val id     = r.id    ?: return@mapNotNull null
             val title  = r.title ?: "Unknown"
-            val poster = r.image?.toHttps() ?: "https://imgcdn.kim/poster/1920/$id.jpg"
+            val poster = r.image?.toHttps()?.takeIf { it.isNotBlank() }
+                ?: "https://imgcdn.kim/poster/v/$id.jpg"
 
-            newMovieSearchResponse(title, id, TvType.Movie) {
+            newMovieSearchResponse(title, "$title|$id", TvType.Movie) {
                 this.posterUrl = poster
             }
         }
@@ -68,17 +70,21 @@ class Net77Provider : MainAPI() {
         return data.searchResult.orEmpty().mapNotNull { r ->
             val id     = r.id    ?: return@mapNotNull null
             val title  = r.title ?: "Unknown"
-            val poster = r.image?.toHttps() ?: "https://imgcdn.kim/poster/1920/$id.jpg"
+            val poster = r.image?.toHttps()?.takeIf { it.isNotBlank() }
+                ?: "https://imgcdn.kim/poster/v/$id.jpg"
 
-            newMovieSearchResponse(title, id, TvType.Movie) {
+            newMovieSearchResponse(title, "$title|$id", TvType.Movie) {
                 this.posterUrl = poster
             }
         }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val postId    = url.trim('/')
-        val posterUrl = "https://imgcdn.kim/poster/1920/$postId.jpg"
+        val parts  = url.split("|")
+        val title  = if (parts.size > 1) parts[0] else "Net77 Title"
+        val postId = if (parts.size > 1) parts[1] else url.trim('/')
+
+        val posterUrl = "https://imgcdn.kim/poster/v/$postId.jpg"
 
         val epUrl = "$mainUrl/episodes.php?s=$postId"
         val epRes = try {
@@ -102,12 +108,12 @@ class Net77Provider : MainAPI() {
                 }
             }
 
-            return newTvSeriesLoadResponse("Net77 Series $postId", postId, TvType.TvSeries, csEpisodes) {
+            return newTvSeriesLoadResponse(title, url, TvType.TvSeries, csEpisodes) {
                 this.posterUrl = posterUrl
             }
         }
 
-        return newMovieLoadResponse("Net77 Content $postId", postId, TvType.Movie, postId) {
+        return newMovieLoadResponse(title, url, TvType.Movie, postId) {
             this.posterUrl = posterUrl
         }
     }
@@ -135,21 +141,30 @@ class Net77Provider : MainAPI() {
                 val rawFile = source.file ?: return@forEach
                 val fileUrl = if (rawFile.startsWith("http")) rawFile else "$mainUrl$rawFile"
                 val label   = source.label ?: "HD"
-                val quality = getQualityFromName(label)
 
-                callback(
-                    newExtractorLink(
-                        source  = name,
-                        name    = "$name [$label]",
-                        url     = fileUrl,
-                        type    = ExtractorLinkType.M3U8
-                    ) {
-                        this.quality = quality
-                        this.referer = "$mainUrl/"
-                        this.headers = mapOf("Referer" to "$mainUrl/")
-                    }
-                )
-                foundAny = true
+                try {
+                    M3u8Helper.generateM3u8(
+                        source    = name,
+                        streamUrl = fileUrl,
+                        referer   = "$mainUrl/"
+                    ).forEach(callback)
+                    foundAny = true
+                } catch (_: Throwable) {
+                    val quality = getQualityFromName(label)
+                    callback(
+                        newExtractorLink(
+                            source  = name,
+                            name    = "$name [$label]",
+                            url     = fileUrl,
+                            type    = ExtractorLinkType.M3U8
+                        ) {
+                            this.quality = quality
+                            this.referer = "$mainUrl/"
+                            this.headers = commonHeaders
+                        }
+                    )
+                    foundAny = true
+                }
             }
 
             playlist.tracks?.forEach { track ->
