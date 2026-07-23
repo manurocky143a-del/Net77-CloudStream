@@ -1,0 +1,19 @@
+[
+  {
+    "name": "NetMirror (Net77)",
+    "internalName": "Net77Provider",
+    "version": 1,
+    "description": "Watch Netflix, Hotstar & Prime Video via net77.cc (NetMirror mirror)",
+    "language": "hi",
+    "authors": [
+      "manurocky143a-del"
+    ],
+    "status": 1,
+    "tvTypes": [
+      "Movie",
+      "TvSeries"
+    ],
+    "iconUrl": "https://www.google.com/s2/favicons?domain=net77.cc&sz=64",
+    "url": "https://raw.githubusercontent.com/manurocky143a-del/Net77-CloudStream/main/docs/Net77Provider.cs3"
+  }
+]
