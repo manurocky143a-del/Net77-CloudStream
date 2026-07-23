@@ -3,7 +3,6 @@
   "description": "Official CloudStream provider for Net77 (NetMirror)",
   "manifestVersion": 1,
   "pluginLists": [
-    "https://raw.githubusercontent.com/manurocky143a-del/Net77-CloudStream/main/docs/plugins.json",
     "https://manurocky143a-del.github.io/Net77-CloudStream/plugins.json"
   ]
 }
