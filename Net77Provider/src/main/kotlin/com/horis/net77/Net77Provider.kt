@@ -15,28 +15,33 @@ class Net77Provider : MainAPI() {
     override var mainUrl = "https://net77.cc"
 
     private val commonHeaders = mapOf(
-        "Accept"          to "*/*",
-        "Accept-Language" to "en-US,en;q=0.9",
-        "User-Agent"      to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Referer"         to "$mainUrl/"
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept"     to "*/*",
+        "Referer"    to "$mainUrl/"
     )
 
     override val mainPage = mainPageOf(
-        "$mainUrl/search.php?s=action"  to "Action Movies & Series",
+        "$mainUrl/search.php?s=action"  to "Action Movies",
         "$mainUrl/search.php?s=avatar"  to "Trending Hits",
-        "$mainUrl/search.php?s=marvel"  to "Marvel & Superhero",
+        "$mainUrl/search.php?s=marvel"  to "Superhero & Marvel",
         "$mainUrl/search.php?s=netflix" to "Netflix Specials"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
         if (page > 1) return null
 
-        val res = app.get(request.data, headers = commonHeaders)
+        val res = try {
+            app.get(request.data, headers = commonHeaders, timeout = 15)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            return null
+        }
+
         val data = tryParseJson<SearchData>(res.text) ?: return null
 
         val items = data.searchResult.orEmpty().mapNotNull { r ->
-            val id    = r.id    ?: return@mapNotNull null
-            val title = r.title ?: "Unknown"
+            val id     = r.id    ?: return@mapNotNull null
+            val title  = r.title ?: "Unknown"
             val poster = r.image?.toHttps() ?: "https://imgcdn.kim/poster/1920/$id.jpg"
 
             newMovieSearchResponse(title, id, TvType.Movie) {
@@ -52,12 +57,17 @@ class Net77Provider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val url = "$mainUrl/search.php?s=${query.encUrlEncode()}"
-        val res = app.get(url, headers = commonHeaders)
+        val res = try {
+            app.get(url, headers = commonHeaders, timeout = 15)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            return emptyList()
+        }
 
         val data = tryParseJson<SearchData>(res.text) ?: return emptyList()
         return data.searchResult.orEmpty().mapNotNull { r ->
-            val id    = r.id    ?: return@mapNotNull null
-            val title = r.title ?: "Unknown"
+            val id     = r.id    ?: return@mapNotNull null
+            val title  = r.title ?: "Unknown"
             val poster = r.image?.toHttps() ?: "https://imgcdn.kim/poster/1920/$id.jpg"
 
             newMovieSearchResponse(title, id, TvType.Movie) {
@@ -67,14 +77,17 @@ class Net77Provider : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val postId = url.trim('/')
+        val postId    = url.trim('/')
         val posterUrl = "https://imgcdn.kim/poster/1920/$postId.jpg"
 
-        // Check if episodes exist (TV Series)
         val epUrl = "$mainUrl/episodes.php?s=$postId"
-        val epRes = app.get(epUrl, headers = commonHeaders)
-        val epData = tryParseJson<EpisodesData>(epRes.text)
+        val epRes = try {
+            app.get(epUrl, headers = commonHeaders, timeout = 15)
+        } catch (_: Throwable) {
+            null
+        }
 
+        val epData   = epRes?.text?.let { tryParseJson<EpisodesData>(it) }
         val episodes = epData?.episodes.orEmpty()
 
         if (episodes.isNotEmpty()) {
@@ -94,7 +107,6 @@ class Net77Provider : MainAPI() {
             }
         }
 
-        // Movie
         return newMovieLoadResponse("Net77 Content $postId", postId, TvType.Movie, postId) {
             this.posterUrl = posterUrl
         }
@@ -107,12 +119,16 @@ class Net77Provider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val episodeId = data.trim('/')
-        val url = "$mainUrl/playlist.php?id=$episodeId"
+        val url       = "$mainUrl/playlist.php?id=$episodeId"
 
-        val res = app.get(url, headers = commonHeaders)
+        val res = try {
+            app.get(url, headers = commonHeaders, timeout = 15)
+        } catch (_: Throwable) {
+            return false
+        }
+
         val playlists = tryParseJson<List<PlayList>>(res.text) ?: return false
-
-        var foundAny = false
+        var foundAny  = false
 
         playlists.forEach { playlist ->
             playlist.sources?.forEach { source ->
